@@ -1,6 +1,10 @@
-import sys
+"""
+Gym Membership Management System.
 
-# --- DATOS DE CONFIGURACIÓN ---
+This module handles the logic for calculating gym membership costs,
+applying discounts, and interacting with the user via CLI.
+"""
+
 MEMBERSHIP_PLANS = {
     "Basic": 50,
     "Premium": 100,
@@ -11,173 +15,191 @@ MEMBERSHIP_PLANS = {
 ADDITIONAL_FEATURES = {
     "1": {"name": "Personal Training", "cost": 30, "is_premium": False},
     "2": {"name": "Group Classes", "cost": 20, "is_premium": False},
-    "3": {"name": "Sauna Access", "cost": 40, "is_premium": True},     # Feature Premium
-    "4": {"name": "Nutritional Plan", "cost": 60, "is_premium": True}  # Feature Premium
+    "3": {"name": "Sauna Access", "cost": 40, "is_premium": True},
+    "4": {"name": "Nutritional Plan", "cost": 60, "is_premium": True}
 }
 
+
 def display_menu():
-    """Muestra las opciones de membresía disponibles."""
+    """Display available membership plans."""
     print("\n--- GYM MEMBERSHIP PLANS ---")
     for plan, cost in MEMBERSHIP_PLANS.items():
         print(f"- {plan}: ${cost}")
 
+
 def display_features():
-    """Muestra las características adicionales disponibles."""
+    """Display available additional features."""
     print("\n--- ADDITIONAL FEATURES ---")
     for key, data in ADDITIONAL_FEATURES.items():
         type_str = "[PREMIUM]" if data['is_premium'] else ""
         print(f"{key}. {data['name']} (${data['cost']}) {type_str}")
 
-def calculate_total_cost(plan_name, selected_features_keys, num_members):
-    """
-    Calcula el costo total aplicando recargos y descuentos.
-    Retorna: (costo_final_entero, detalles_diccionario)
-    """
-    
-    # 1. Validación y Costo Base
-    if plan_name not in MEMBERSHIP_PLANS:
-        raise ValueError("Invalid membership plan.")
-    
-    base_cost = MEMBERSHIP_PLANS[plan_name]
-    features_cost = 0
-    has_premium_features = False
-    
-    selected_features_names = []
 
-    # 2. Calcular costo de características
+def _get_features_details(selected_features_keys):
+    """
+    Calculate cost and gather names of selected features.
+    Returns: (features_cost, selected_names, has_premium)
+    """
+    features_cost = 0
+    selected_names = []
+    has_premium = False
+
     for key in selected_features_keys:
         if key in ADDITIONAL_FEATURES:
             feat = ADDITIONAL_FEATURES[key]
             features_cost += feat["cost"]
-            selected_features_names.append(feat["name"])
+            selected_names.append(feat["name"])
             if feat["is_premium"]:
-                has_premium_features = True
+                has_premium = True
         else:
             raise ValueError(f"Invalid feature key: {key}")
+    return features_cost, selected_names, has_premium
 
-    # Subtotal por persona antes de multiplicar por miembros
-    subtotal_per_person = base_cost + features_cost
-    
-    # Costo total bruto (por todos los miembros)
-    total_gross = subtotal_per_person * num_members
 
-    # 3. Aplicar Recargo Premium (15%)
-    # Assumption: El recargo aplica al total acumulado si hay features premium
-    surcharge = 0
-    if has_premium_features:
-        surcharge = total_gross * 0.15
-    
+def calculate_total_cost(plan_name, selected_features_keys, num_members):
+    """
+    Calculate the total cost applying surcharges and discounts.
+    Returns: (final_cost_int, details_dict)
+    """
+    if plan_name not in MEMBERSHIP_PLANS:
+        raise ValueError("Invalid membership plan.")
+
+    base_cost = MEMBERSHIP_PLANS[plan_name]
+    feat_cost, feat_names, has_premium = _get_features_details(selected_features_keys)
+
+    # Subtotal per person
+    total_gross = (base_cost + feat_cost) * num_members
+
+    # 1. Premium Surcharge (15%)
+    surcharge = total_gross * 0.15 if has_premium else 0.0
     total_after_surcharge = total_gross + surcharge
 
-    # 4. Aplicar Descuento Grupal (10% si son 2 o más)
-    group_discount = 0
-    if num_members >= 2:
-        group_discount = total_after_surcharge * 0.10
-    
+    # 2. Group Discount (10% if 2+ members)
+    group_discount = total_after_surcharge * 0.10 if num_members >= 2 else 0.0
     total_after_group = total_after_surcharge - group_discount
 
-    # 5. Aplicar Descuento Especial (Special Offer)
-    # > $400 -> -$50, > $200 -> -$20
-    special_discount = 0
+    # 3. Special Offer Discount
+    special_discount = 0.0
     if total_after_group > 400:
-        special_discount = 50
+        special_discount = 50.0
     elif total_after_group > 200:
-        special_discount = 20
+        special_discount = 20.0
 
-    final_total = total_after_group - special_discount
-
-    # Asegurar que no sea negativo (aunque es raro en este contexto)
-    final_total = max(0, final_total)
+    final_total = max(0, total_after_group - special_discount)
 
     details = {
         "base_total": total_gross,
         "surcharge": surcharge,
         "group_discount": group_discount,
         "special_discount": special_discount,
-        "features_names": selected_features_names
+        "features_names": feat_names
     }
 
     return int(final_total), details
 
-def main():
+
+def get_user_input_plan():
+    """Get and validate plan selection from user."""
+    display_menu()
+    plan = input("Enter the name of the plan you want (e.g., Basic): ").strip()
+    if plan not in MEMBERSHIP_PLANS:
+        print("Error: Plan not available.")
+        return None
+    return plan
+
+
+def get_user_input_members():
+    """Get and validate number of members."""
+    try:
+        num = int(input("How many members are signing up? "))
+        if num < 1:
+            print("Error: At least one member is required.")
+            return None
+        if num >= 2:
+            print(">> NOTE: Group discount of 10% will be applied!")
+        return num
+    except ValueError:
+        print("Error: Invalid number.")
+        return None
+
+
+def get_user_input_features():
+    """Get and validate features selection."""
+    display_features()
+    print("Enter feature numbers separated by comma (e.g., 1,3) or leave empty.")
+    f_input = input("Selection: ").strip()
+    selected_keys = [k.strip() for k in f_input.split(',')] if f_input else []
+
+    # Validate existence
+    for key in selected_keys:
+        if key not in ADDITIONAL_FEATURES:
+            print(f"Error: Feature '{key}' is not available.")
+            return None
+    return selected_keys
+
+
+def confirm_purchase(plan, num_members, cost, details):
+    """Display summary and ask for confirmation."""
+    print("\n--- CONFIRMATION ---")
+    feat_str = ', '.join(details['features_names']) if details['features_names'] else 'None'
+    print(f"Plan: {plan} (x{num_members} members)")
+    print(f"Features: {feat_str}")
+    print(f"Gross Total: ${details['base_total']:.2f}")
+
+    if details['surcharge'] > 0:
+        print(f"Premium Surcharge (+15%): +${details['surcharge']:.2f}")
+    if details['group_discount'] > 0:
+        print(f"Group Discount (-10%): -${details['group_discount']:.2f}")
+    if details['special_discount'] > 0:
+        print(f"Special Offer Discount: -${details['special_discount']:.2f}")
+
+    print(f"\nFINAL TOTAL COST: ${cost}")
+
+    confirm = input("\nDo you want to confirm this membership? (yes/no): ").lower()
+    if confirm in ('yes', 'y'):
+        print(f"Membership Confirmed! Total to pay: ${cost}")
+        return True
+    print("Membership Canceled.")
+    return False
+
+
+def run_gym_system():
+    """
+    Main execution flow of the Gym System.
+    Returns total cost (int) or -1 on failure/cancel.
+    """
     print("Welcome to the Gym Membership Management System")
 
-    try:
-        # --- PASO 1: Selección de Plan ---
-        display_menu()
-        plan_choice = input("Enter the name of the plan you want (e.g., Basic): ").strip()
-        
-        # Validación simple de existencia (case sensitive para simplificar)
-        # Se podría mejorar con .title()
-        if plan_choice not in MEMBERSHIP_PLANS:
-            print("Error: Plan not available. Please restart.")
-            return -1
-
-        # --- PASO 2: Cantidad de Miembros ---
-        try:
-            num_members = int(input("How many members are signing up? "))
-            if num_members < 1:
-                print("Error: At least one member is required.")
-                return -1
-            if num_members >= 2:
-                print(">> NOTE: Group discount of 10% will be applied!")
-        except ValueError:
-            print("Error: Invalid number.")
-            return -1
-
-        # --- PASO 3: Selección de Features ---
-        display_features()
-        print("Enter feature numbers separated by comma (e.g., 1,3) or leave empty for none.")
-        features_input = input("Selection: ").strip()
-        
-        selected_keys = []
-        if features_input:
-            selected_keys = [k.strip() for k in features_input.split(',')]
-
-        # Validar disponibilidad de features antes de calcular
-        for k in selected_keys:
-            if k not in ADDITIONAL_FEATURES:
-                print(f"Error: Feature '{k}' is not available.")
-                return -1
-
-        # --- PASO 4: Cálculo ---
-        try:
-            total_cost, details = calculate_total_cost(plan_choice, selected_keys, num_members)
-        except ValueError as e:
-            print(f"Calculation Error: {e}")
-            return -1
-
-        # --- PASO 5: Confirmación ---
-        print("\n--- CONFIRMATION ---")
-        print(f"Plan: {plan_choice} (x{num_members} members)")
-        print(f"Features: {', '.join(details['features_names']) if details['features_names'] else 'None'}")
-        print(f"Gross Total: ${details['base_total']:.2f}")
-        
-        if details['surcharge'] > 0:
-            print(f"Premium Surcharge (+15%): +${details['surcharge']:.2f}")
-            
-        if details['group_discount'] > 0:
-            print(f"Group Discount (-10%): -${details['group_discount']:.2f}")
-            
-        if details['special_discount'] > 0:
-            print(f"Special Offer Discount: -${details['special_discount']:.2f}")
-
-        print(f"\nFINAL TOTAL COST: ${total_cost}")
-        
-        confirm = input("\nDo you want to confirm this membership? (yes/no): ").lower()
-        
-        if confirm == 'yes' or confirm == 'y':
-            print(f"Membership Confirmed! Total to pay: ${total_cost}")
-            return total_cost
-        else:
-            print("Membership Canceled.")
-            return -1
-
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+    # Step 1: Plan
+    plan_choice = get_user_input_plan()
+    if not plan_choice:
         return -1
 
+    # Step 2: Members
+    num_members = get_user_input_members()
+    if not num_members:
+        return -1
+
+    # Step 3: Features
+    selected_keys = get_user_input_features()
+    if selected_keys is None:
+        return -1
+
+    # Step 4: Calculation
+    try:
+        total_cost, details = calculate_total_cost(plan_choice, selected_keys, num_members)
+    except ValueError as err:
+        print(f"Calculation Error: {err}")
+        return -1
+
+    # Step 5: Confirmation
+    if confirm_purchase(plan_choice, num_members, total_cost, details):
+        return total_cost
+
+    return -1
+
+
 if __name__ == "__main__":
-    result = main()
-    # Para propósitos de demostración en terminal
-    print(f"\n[System Exit Code]: {result}")
+    FINAL_RESULT = run_gym_system()
+    # Debug print as requested by logic requirements
+    # print(f"System Exit Code: {FINAL_RESULT}")
