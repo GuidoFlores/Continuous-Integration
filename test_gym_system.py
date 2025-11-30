@@ -1,5 +1,5 @@
 """
-Unit tests for the Gym Membership System
+Unit tests for the Gym Membership System.
 """
 import unittest
 from gym_system import calculate_total_cost
