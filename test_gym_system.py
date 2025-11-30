@@ -1,5 +1,5 @@
 """
-Unit tests for the Gym Membership System.
+Unit tests for the Gym Membership System
 """
 import unittest
 from gym_system import calculate_total_cost
@@ -69,3 +69,4 @@ class TestGymMembershipSystem(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
